@@ -15,11 +15,15 @@ iwara.tv 的安卓第三方客户端（个人自用），Kotlin + Jetpack Compos
 ## 命令（PowerShell）
 
 - 编译安装：`.\gradlew.bat installDebug`
-- 发布包：`.\gradlew.bat assembleRelease` → `app\build\outputs\apk\release\app-release.apk`
+- 测试包：`.\gradlew.bat assembleDebug` → `app\build\outputs\apk\debug\IwaraPhone-<版本>-debug.apk`
+  - 包名 `com.example.iwaraphone.debug`、桌面名「IwaraPhone 测试版」，可与正式版同时安装（数据和登录互相独立）
+- 版本号：改 `app\build.gradle.kts` 顶部的 `appVersionCode`（每次发版 +1）/ `appVersionName`；「我的」页底部显示当前版本
+- 发布包：`.\gradlew.bat assembleRelease` → `app\build\outputs\apk\release\IwaraPhone-<版本>-release.apk`
   - 签名读取根目录 `keystore.properties`（指向 `E:\Android\keystore\iwaraphone.jks`），两者都不进 git；丢失签名文件将无法覆盖升级已安装的 App，需自行备份
   - release 开启了 R8 全量优化；改动后要用 release 包跑一遍 `tools\test_features.py`（模板默认的 `packageScope` 局部优化会导致启动崩溃，不要加回去）
 - 功能测试（模拟器上逐项点击验证，21 项，约 7 分钟）：`python -u tools\test_features.py`
   - 只跑部分用例：`python -u tools\test_features.py 视频 历史`（按用例名前缀筛选）
+  - 默认测 debug 包；测 release 包先设 `IW_PKG=com.example.iwaraphone`
   - 登录用例需要环境变量 `IW_EMAIL` / `IW_PWD`，**不要把账号写进任何文件**
   - 失败截图在 `build\test\fail_*.png`；先确认不是本机代理抖动（logcat 里 chromium `handshake failed ... net_error -100`），再查代码
 - 在 WebView 页面里调接口（探索 API 用）：`python tools\cdp_fetch.py "/videos?limit=2"`

@@ -10,6 +10,13 @@ val keystoreProps = Properties().apply {
     rootProject.file("keystore.properties").takeIf { it.exists() }?.inputStream()?.use(::load)
 }
 
+// 每次发版改这里：versionCode 递增，versionName 用 主.次.修订
+val appVersionCode = 2
+val appVersionName = "1.1.0"
+
+// 安装包文件名带版本号：IwaraPhone-1.1.0-debug.apk / IwaraPhone-1.1.0-release.apk
+base.archivesName = "IwaraPhone-$appVersionName"
+
 android {
     namespace = "com.example.iwaraphone"
     compileSdk {
@@ -20,8 +27,9 @@ android {
         applicationId = "com.example.iwaraphone"
         minSdk = 24
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
+        manifestPlaceholders["appLabel"] = "IwaraPhone"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -36,6 +44,12 @@ android {
     }
 
     buildTypes {
+        // 测试版用独立包名，可以和正式版同时安装（签名不同也不冲突），桌面名称和版本号带"测试版 / -debug"以便区分
+        debug {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+            manifestPlaceholders["appLabel"] = "IwaraPhone 测试版"
+        }
         release {
             signingConfig = signingConfigs.findByName("release")
             // 整个应用一起优化。模板默认的 packageScope 只优化 androidx/kotlin，

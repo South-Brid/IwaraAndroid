@@ -1,5 +1,8 @@
 package com.example.iwaraphone.ui.profile
 
+import android.os.Build
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -91,7 +94,17 @@ fun ProfileScreen(onOpenWeb: () -> Unit, onOpenHistory: () -> Unit, vm: ProfileV
         }
         HistoryEntryRow(onOpenHistory)
         TextButton(onClick = onOpenWeb) { Text("打开网页版（网页登录 / 人机验证）") }
+        VersionText()
     }
+}
+
+@Composable
+private fun VersionText() {
+    val ctx = LocalContext.current
+    val info = remember { ctx.packageManager.getPackageInfo(ctx.packageName, 0) }
+    @Suppress("DEPRECATION")
+    val code = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) info.longVersionCode else info.versionCode.toLong()
+    Text("版本 ${info.versionName}（$code）", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 @Composable

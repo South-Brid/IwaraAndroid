@@ -8,7 +8,8 @@ import xml.etree.ElementTree as ET
 
 _SDK = os.environ.get("ANDROID_HOME") or os.environ.get("ANDROID_SDK_ROOT")
 ADB = os.path.join(_SDK, "platform-tools", "adb.exe") if _SDK else shutil.which("adb") or "adb"
-PKG = "com.example.iwaraphone"
+# debug 包带 .debug 后缀；测 release 包时设置环境变量 IW_PKG=com.example.iwaraphone
+PKG = os.environ.get("IW_PKG", "com.example.iwaraphone.debug")
 
 
 def adb(*args, check=True):
@@ -83,4 +84,4 @@ def shot(path):
 
 def restart():
     adb("shell", "am", "force-stop", PKG)
-    adb("shell", "am", "start", "-n", f"{PKG}/.MainActivity")
+    adb("shell", "am", "start", "-n", f"{PKG}/com.example.iwaraphone.MainActivity")
