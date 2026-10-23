@@ -4,12 +4,15 @@ iwara.tv 的安卓第三方客户端（个人自用），Kotlin + Jetpack Compos
 
 ## 环境
 
-- Android SDK：`F:\jetbrains\AndroidStudioSDK`；JDK：Android Studio 自带 `F:\jetbrains\Android Studio\jbr`
+- 开发工具和缓存一律放 E 盘，不要装到 C 盘
+- Android SDK：`E:\Jet\AndroidStudioSDK`；JDK：Android Studio 自带 `E:\Jet\Android Studio\jbr`
+- 用户环境变量已设置：`ANDROID_HOME`、`JAVA_HOME`（上面两个路径）、`GRADLE_USER_HOME=E:\Jet\GradleHome`、`ANDROID_AVD_HOME=E:\Jet\AndroidAVD`；PATH 含 `platform-tools`、`emulator`、`%JAVA_HOME%\bin`
+- `local.properties`（不进 git）里 `sdk.dir` 指向上面的 SDK
 - Gradle 和 Maven 依赖走国内镜像（见 `gradle-wrapper.properties`、`settings.gradle.kts`），官方源作为备用
-- 模拟器：`Medium_Phone_API_37.0`，存放在 `F:\jetbrains\AndroidAVD`（用户环境变量 `ANDROID_AVD_HOME` 已指向这里，不占 C 盘），需带代理启动才能访问 iwara：
+- 模拟器：`Medium_Phone_API_37.0`，存放在 `E:\Jet\AndroidAVD`，需带代理启动才能访问 iwara：
   `emulator -avd Medium_Phone_API_37.0 -http-proxy http://127.0.0.1:7897`
 
-## 命令（PowerShell，需先设置 `JAVA_HOME` 为上面的 JBR）
+## 命令（PowerShell）
 
 - 编译安装：`.\gradlew.bat installDebug`
 - 发布包：`.\gradlew.bat assembleRelease` → `app\build\outputs\apk\release\app-release.apk`

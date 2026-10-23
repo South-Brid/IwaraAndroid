@@ -1,10 +1,13 @@
 """基于 adb + uiautomator 的简易界面测试工具（开发调试用）"""
+import os
 import re
+import shutil
 import subprocess
 import time
 import xml.etree.ElementTree as ET
 
-ADB = r"F:\jetbrains\AndroidStudioSDK\platform-tools\adb.exe"
+_SDK = os.environ.get("ANDROID_HOME") or os.environ.get("ANDROID_SDK_ROOT")
+ADB = os.path.join(_SDK, "platform-tools", "adb.exe") if _SDK else shutil.which("adb") or "adb"
 PKG = "com.example.iwaraphone"
 
 
