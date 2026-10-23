@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 12+ 系统启动页：图标默认取桌面图标，这里设置与图标一致的浅青绿背景 -->
+    <style name="Theme.IwaraPhone" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowSplashScreenBackground">#FFE8FFF9</item>
+    </style>
+</resources>
