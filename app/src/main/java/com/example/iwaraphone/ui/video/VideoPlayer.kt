@@ -1,6 +1,7 @@
 package com.example.iwaraphone.ui.video
 
 import android.app.Activity
+import android.content.pm.ActivityInfo
 import android.media.AudioManager
 import android.provider.Settings
 import android.view.WindowManager
@@ -43,6 +44,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
@@ -89,6 +92,7 @@ import kotlin.math.roundToInt
 private const val AUTO_HIDE_MS = 4_000L
 private const val POLL_MS = 250L
 private const val RESUME_HINT_MS = 3_000L
+private const val FLASH_MS = 1_500L
 /** 横向滑满整个播放器宽度对应的最大跳转时长 */
 private const val MAX_SEEK_SPAN_MS = 180_000L
 
@@ -107,6 +111,10 @@ private class PlayerUi {
     var buffering by mutableStateOf(true)
     var seekPreview by mutableStateOf<Long?>(null)
     var hint by mutableStateOf<String?>(null)
+    /** 短暂提示（如锁定 / 解锁），显示一会儿后自动清空 */
+    var flash by mutableStateOf<String?>(null)
+    /** 全屏锁定：屏蔽手势、控制栏和返回键，固定屏幕方向 */
+    var locked by mutableStateOf(false)
     /** 每次交互 +1，用于重置自动隐藏计时 */
     var interaction by mutableIntStateOf(0)
 
@@ -188,8 +196,8 @@ fun VideoPlayer(
             delay(POLL_MS)
         }
     }
-    LaunchedEffect(ui.controlsVisible, ui.isPlaying, ui.panel, ui.interaction) {
-        if (ui.controlsVisible && ui.isPlaying && ui.panel == Panel.None) {
+    LaunchedEffect(ui.controlsVisible, ui.isPlaying, ui.locked, ui.panel, ui.interaction) {
+        if (ui.controlsVisible && (ui.isPlaying || ui.locked) && ui.panel == Panel.None) {
             delay(AUTO_HIDE_MS)
             ui.controlsVisible = false
         }
@@ -201,7 +209,26 @@ fun VideoPlayer(
             vm.resumeHint = null
         }
     }
+    LaunchedEffect(ui.flash) {
+        if (ui.flash != null) {
+            delay(FLASH_MS)
+            ui.flash = null
+        }
+    }
     BackHandler(enabled = ui.panel != Panel.None) { ui.panel = Panel.None }
+    BackHandler(enabled = ui.locked) {
+        ui.controlsVisible = true
+        ui.flash = "屏幕已锁定，点击左侧锁图标解锁"
+        ui.touch()
+    }
+    val setLocked = { on: Boolean ->
+        ui.locked = on
+        ui.panel = Panel.None
+        ui.controlsVisible = true
+        ui.flash = if (on) "屏幕已锁定" else "已解锁"
+        ui.touch()
+        activity.requestedOrientation = if (on) ActivityInfo.SCREEN_ORIENTATION_LOCKED else ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+    }
 
     Box(modifier.background(Color.Black)) {
         AndroidView(
@@ -222,9 +249,21 @@ fun VideoPlayer(
             else -> ui.hint
         }
         badge?.let { CenterBadge(it, Modifier.align(if (vm.boosting) Alignment.TopCenter else Alignment.Center)) }
+        ui.flash?.let { CenterBadge(it, Modifier.align(Alignment.TopCenter)) }
         vm.resumeHint?.let { CenterBadge(it, Modifier.align(Alignment.BottomStart).padding(bottom = 40.dp)) }
-        AnimatedVisibility(ui.controlsVisible && !vm.boosting, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
+        AnimatedVisibility(ui.controlsVisible && !vm.boosting && !ui.locked, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
             Controls(vm, ui, title, fullscreen, onFullscreen, onBack)
+        }
+        if (fullscreen) AnimatedVisibility(
+            ui.controlsVisible && !vm.boosting, enter = fadeIn(), exit = fadeOut(),
+            modifier = Modifier.align(Alignment.CenterStart).padding(start = 24.dp),
+        ) {
+            IconButton(
+                onClick = { setLocked(!ui.locked) },
+                modifier = Modifier.size(44.dp).background(Color(0x66000000), CircleShape),
+            ) {
+                Icon(if (ui.locked) Icons.Filled.Lock else Icons.Filled.LockOpen, if (ui.locked) "解锁" else "锁定", tint = Color.White)
+            }
         }
         SidePanel(vm, ui, fullscreen)
         vm.playError?.let { err ->
@@ -261,11 +300,11 @@ private fun GestureLayer(vm: VideoViewModel, ui: PlayerUi, activity: Activity) {
                         ui.touch()
                     },
                     onDoubleTap = {
-                        player.togglePlay()
+                        if (!ui.locked) player.togglePlay()
                         ui.controlsVisible = true
                         ui.touch()
                     },
-                    onLongPress = { if (player.isPlaying) vm.setBoost(true) },
+                    onLongPress = { if (player.isPlaying && !ui.locked) vm.setBoost(true) },
                     onPress = {
                         tryAwaitRelease()
                         if (vm.boosting) vm.setBoost(false)
@@ -295,6 +334,7 @@ private fun GestureLayer(vm: VideoViewModel, ui: PlayerUi, activity: Activity) {
                     },
                 ) { change, delta ->
                     change.consume()
+                    if (ui.locked) return@detectDragGestures
                     acc += delta
                     if (mode == DragMode.None) {
                         mode = when {
