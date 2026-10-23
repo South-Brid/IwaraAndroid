@@ -34,12 +34,26 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // v2 + v3 签名（minSdk ≥ 24 时 AGP 不生成 v1，系统也不需要）
     signingConfigs {
+        getByName("debug") {
+            enableV2Signing = true
+            enableV3Signing = true
+        }
         if (keystoreProps.isNotEmpty()) create("release") {
             storeFile = file(keystoreProps.getProperty("storeFile"))
             storePassword = keystoreProps.getProperty("storePassword")
             keyAlias = keystoreProps.getProperty("keyAlias")
             keyPassword = keystoreProps.getProperty("keyPassword")
+            enableV2Signing = true
+            enableV3Signing = true
+        }
+    }
+
+    // 原生库压缩存放、安装时解压（extractNativeLibs=true）：兼容性最好，安装包也更小
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
         }
     }
 
