@@ -37,6 +37,7 @@ object WebBridge {
     private const val TAG = "WebBridge"
     private const val READY_TIMEOUT_MS = 120_000L
     private const val FETCH_TIMEOUT_MS = 30_000L
+    private const val JS_ABORT_MS = 15_000L
     private const val EVAL_TIMEOUT_MS = 10_000L
 
     private val main = Handler(Looper.getMainLooper())
@@ -144,12 +145,19 @@ object WebBridge {
         val id = UUID.randomUUID().toString()
         val deferred = CompletableDeferred<BridgeResponse>()
         pending[id] = deferred
-        val opts = JSONObject().put("method", method).put("headers", JSONObject(headers)).put("credentials", "include")
+        val opts = JSONObject().put("method", method).put("headers", JSONObject(headers)).put("credentials", "include").put("cache", "no-store")
         if (body != null) opts.put("body", body)
+        val qid = JSONObject.quote(id)
+        // 页面内超时中止：偶发卡死的连接会变成 status 0（网络失败），由上层自动重试，而不是干等到 Kotlin 侧超时
         val js = """
-            fetch(${JSONObject.quote(url)}, $opts)
-              .then(r => r.text().then(t => AndroidBridge.onResult(${JSONObject.quote(id)}, r.status, t)))
-              .catch(e => AndroidBridge.onResult(${JSONObject.quote(id)}, 0, String(e)));
+            (function() {
+              const ctrl = new AbortController();
+              const timer = setTimeout(() => ctrl.abort(), $JS_ABORT_MS);
+              const done = (s, t) => { clearTimeout(timer); AndroidBridge.onResult($qid, s, t); };
+              fetch(${JSONObject.quote(url)}, Object.assign($opts, { signal: ctrl.signal }))
+                .then(r => r.text().then(t => done(r.status, t)))
+                .catch(e => done(0, String(e)));
+            })();
         """.trimIndent()
         main.post { webView?.evaluateJavascript(js, null) }
         return try {

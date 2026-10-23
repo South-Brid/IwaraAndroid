@@ -41,7 +41,7 @@ object AuthRepository : TokenProvider {
     override suspend fun accessToken(): String? {
         if (accessToken != null && System.currentTimeMillis() - accessTokenAt < ACCESS_TTL_MS) return accessToken
         val refresh = refreshToken() ?: return null
-        val r = ApiClient.request(ApiClient.url("/user/token"), "POST", headers = mapOf("Authorization" to "Bearer $refresh"), auth = false)
+        val r = ApiClient.request(ApiClient.url("/user/token"), "POST", headers = mapOf("Authorization" to "Bearer $refresh"), auth = false, retry = true)
         if (r.status == 401) Session.refreshToken = null
         accessToken = runCatching { JSONObject(r.body).getString("accessToken") }.getOrNull()
         accessTokenAt = System.currentTimeMillis()
@@ -50,7 +50,7 @@ object AuthRepository : TokenProvider {
 
     suspend fun login(email: String, password: String) {
         val body = JSONObject().put("email", email).put("password", password)
-        Session.refreshToken = JSONObject(ApiClient.post("/user/login", body, auth = false)).getString("token")
+        Session.refreshToken = JSONObject(ApiClient.post("/user/login", body, auth = false, retry = true)).getString("token")
         accessToken = null
         refresh()
     }

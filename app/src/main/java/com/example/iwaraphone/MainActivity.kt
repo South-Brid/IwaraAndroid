@@ -26,6 +26,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.Text
@@ -49,7 +51,9 @@ import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.iwaraphone.bridge.WebBridge
 import com.example.iwaraphone.data.AuthRepository
+import com.example.iwaraphone.data.local.HistoryStore
 import com.example.iwaraphone.data.local.Session
+import com.example.iwaraphone.ui.history.HistoryScreen
 import com.example.iwaraphone.data.remote.ApiClient
 import com.example.iwaraphone.ui.debug.DebugScreen
 import com.example.iwaraphone.ui.follow.FollowScreen
@@ -70,6 +74,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         // 组装依赖：本地存储 → 令牌提供者 → 浏览器通道
         Session.init(this)
+        HistoryStore.init(this)
         ApiClient.tokenProvider = AuthRepository
         WebView.setWebContentsDebuggingEnabled(applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0)
         val webView = WebView(this)
@@ -84,12 +89,12 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Tab(val label: String, val icon: ImageVector) {
+private enum class Tab(val label: String, val icon: ImageVector, val debugOnly: Boolean = false) {
     Home("首页", Icons.Filled.Home),
     Search("搜索", Icons.Filled.Search),
     Follow("关注", Icons.Filled.Favorite),
     Me("我的", Icons.Filled.Person),
-    Debug("调试", Icons.Filled.Build),
+    Debug("调试", Icons.Filled.Build, debugOnly = true),
 }
 
 @Composable
@@ -106,15 +111,25 @@ private fun App(webView: WebView) {
         scope.launch { AuthRepository.refresh() }
     }
     val openVideo = { id: String -> nav.push(Route.VideoDetail(id)) }
+    val debuggable = LocalContext.current.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
+    val tabs = Tab.entries.filter { debuggable || !it.debugOnly }
 
     BackHandler(enabled = webOpen) { if (webView.canGoBack()) webView.goBack() else closeWeb() }
 
     Scaffold(
         contentWindowInsets = if (fullscreen) WindowInsets(0) else ScaffoldDefaults.contentWindowInsets,
         bottomBar = {
-            if (nav.top == null && !showWeb) NavigationBar {
-                Tab.entries.forEach { t ->
-                    NavigationBarItem(selected = tab == t, onClick = { tab = t }, icon = { Icon(t.icon, t.label) }, label = { Text(t.label) })
+            if (nav.top == null && !showWeb) NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
+                tabs.forEach { t ->
+                    NavigationBarItem(
+                        selected = tab == t, onClick = { tab = t },
+                        icon = { Icon(t.icon, t.label) }, label = { Text(t.label) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                        ),
+                    )
                 }
             }
         },
@@ -133,15 +148,17 @@ private fun App(webView: WebView) {
                                 searchVm.addTag(t)
                             },
                             onUser = { nav.push(Route.UserVideos(it)) },
+                            onOpenVideo = openVideo,
                         ) { fullscreen = false; nav.pop() }
                         is Route.UserVideos -> UserVideosScreen(r.user, onOpen = { openVideo(it.id) }, onBack = nav::pop)
+                        Route.History -> HistoryScreen(onOpen = openVideo, onBack = nav::pop)
                     }
                 }
             } else when (tab) {
-                Tab.Home -> HomeScreen(onOpen = { openVideo(it.id) })
+                Tab.Home -> HomeScreen(onOpen = { openVideo(it.id) }, onSearch = { tab = Tab.Search })
                 Tab.Search -> SearchScreen(searchVm, onOpen = { openVideo(it.id) })
                 Tab.Follow -> FollowScreen(onUser = { nav.push(Route.UserVideos(it)) }, onOpen = { openVideo(it.id) }, onLogin = { tab = Tab.Me })
-                Tab.Me -> ProfileScreen(onOpenWeb = { webOpen = true })
+                Tab.Me -> ProfileScreen(onOpenWeb = { webOpen = true }, onOpenHistory = { nav.push(Route.History) })
                 Tab.Debug -> DebugScreen()
             }
             if (showWeb) WebToolbar(webView, closable = webOpen, onClose = closeWeb)

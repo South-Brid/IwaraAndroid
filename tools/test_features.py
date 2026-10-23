@@ -9,22 +9,27 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from ui import ADB, find, key, restart, shot, tap, tap_text, texts, type_text, wait_for  # noqa: E402
+from ui import ADB, find, key, nodes, restart, shot, tap, tap_text, texts, type_text, wait_for  # noqa: E402
 
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "build", "test")
 os.makedirs(OUT, exist_ok=True)
 results = []
+# 可选参数：只跑名称前缀匹配的用例，例如 python tools/test_features.py 视频 历史
+ONLY = sys.argv[1:]
 
 
 def case(name):
     def deco(fn):
         def run():
+            if ONLY and not any(name.startswith(p) for p in ONLY):
+                return
             try:
                 results.append(("PASS", name, fn() or ""))
             except Exception as e:  # noqa: BLE001
                 path = os.path.join(OUT, f"fail_{len(results):02d}.png")
                 shot(path)
                 results.append(("FAIL", name, f"{e} | 截图 {path}"))
+            print(f"[{len(results):02d}] [{results[-1][0]}] {name}", flush=True)
         return run
     return deco
 
@@ -167,10 +172,46 @@ def t_feed():
 
 
 # ---------------------------------------------------------------- 视频页
-def player_box():
-    out = subprocess.run([ADB, "shell", "wm", "size"], capture_output=True, text=True).stdout
-    w = int(out.strip().split()[-1].split("x")[0])
-    return w // 2, int(w * 9 / 16 / 2) + 140
+# 竖屏播放器左上区域：避开中间的播放键，点这里只会显隐控制栏 / 触发长按
+PLAYER_SPOT = (250, 250)
+
+
+def control_nodes():
+    """控制栏 3.5 秒自动隐藏，而一次界面快照要 1~2 秒：点画面直到控制栏出现，返回同一次快照的节点"""
+    for _ in range(4):
+        ns = nodes()
+        if any(n["desc"] in ("全屏", "退出全屏") for n in ns):
+            return ns
+        tap(*PLAYER_SPOT)
+        time.sleep(0.5)
+    raise AssertionError("控制栏没有出现")
+
+
+def show_controls():
+    return [n["text"] or n["desc"] for n in control_nodes()]
+
+
+def tap_control(label, wait=1.2):
+    """先点画面让控制栏"刚刚出现"（自动隐藏计时重新开始），再在同一次快照里立即点击目标"""
+    for _ in range(3):
+        tap(*PLAYER_SPOT)
+        time.sleep(0.4)
+        ns = nodes()
+        if any(n["desc"] in ("全屏", "退出全屏") for n in ns):
+            n = next((n for n in ns if label in (n["text"], n["desc"])), None)
+            assert n, f"控制栏里没有「{label}」"
+            tap(n["x"], n["y"])
+            time.sleep(wait)
+            return
+    raise AssertionError("控制栏没有出现")
+
+
+def dismiss_system_hint():
+    """首次全屏时系统会弹出"Viewing full screen"提示"""
+    n = find("Got it", exact=True)
+    if n:
+        tap(n["x"], n["y"])
+        time.sleep(1)
 
 
 @case("视频 · 打开并播放")
@@ -179,28 +220,53 @@ def t_video():
     time.sleep(2)
     first = next(t for t in texts() if t.startswith("▶ "))
     tap_text(first, exact=True, wait=12)
-    wait_for("清晰度", timeout=30)
+    wait_for("作品 ›", timeout=40)
+    time.sleep(3)
     assert not find("播放失败"), "出现播放失败"
-    return "已加载清晰度和播放器，无播放错误"
+    return "详情和播放器已加载，无播放错误"
 
 
-@case("视频 · 倍速 1.5x")
+@case("视频 · 播放器内切换画质")
+def t_quality():
+    tap_control("清晰度")
+    options = [t for t in texts() if t in ("原画", "540P", "360P", "预览")]
+    assert len(options) >= 2, f"画质面板选项不足：{options}"
+    target = "360P" if "360P" in options else options[-1]
+    tap_text(target, exact=True, wait=3)
+    assert target in show_controls(), f"切换后按钮没有显示 {target}"
+    return f"面板选项 {options}，已切换到 {target}"
+
+
+@case("视频 · 播放器内倍速 1.5x")
 def t_speed():
-    n = tap_text("1.5x", exact=True, wait=1)
-    return "已选择 1.5x，长按提示变为 3.0x" if find("3.0x 倍速") else "已选择 1.5x"
+    tap_control("倍速")
+    tap_text("1.5x", exact=True, wait=1.5)
+    assert "1.5x" in show_controls(), "倍速按钮没有显示 1.5x"
+    return "已切换到 1.5x"
 
 
 @case("视频 · 长按倍速")
 def t_longpress():
-    x, y = player_box()
-    subprocess.Popen([ADB, "shell", "input", "swipe", str(x), str(y), str(x), str(y), "3000"])
-    time.sleep(1.8)
-    ok = find("倍速播放中")
-    time.sleep(2)
-    gone = not find("倍速播放中")
-    assert ok, "长按时没有出现倍速提示"
+    x, y = PLAYER_SPOT
+    subprocess.Popen([ADB, "shell", "input", "swipe", str(x), str(y), str(x), str(y), "3500"])
+    time.sleep(2.2)
+    ok = find("倍速中")
+    time.sleep(2.5)
+    gone = not find("倍速中")
+    assert ok, "长按时没有出现倍速提示（可能视频还在缓冲，长按只在播放中生效）"
     assert gone, "松手后倍速提示没有消失"
     return f"长按显示「{ok['text']}」，松手恢复"
+
+
+@case("视频 · 全屏与退出")
+def t_fullscreen():
+    tap_control("全屏", wait=3)
+    dismiss_system_hint()
+    assert "退出全屏" in show_controls(), "没有进入全屏"
+    key(4)
+    time.sleep(2.5)
+    assert find("作品 ›"), "返回键没有退出全屏"
+    return "进入全屏，返回键退出"
 
 
 @case("视频 · 点击作者进入作品页")
@@ -209,7 +275,7 @@ def t_author():
     r = wait_cards()
     key(4)
     time.sleep(2)
-    wait_for("清晰度", timeout=10)
+    wait_for("作品 ›", timeout=10)
     return f"{r}，返回视频页正常"
 
 
@@ -222,9 +288,32 @@ def t_tag_jump():
     return f"跳转搜索 {tag}：{wait_cards()}"
 
 
+@case("历史 · 记录与断点续播")
+def t_history_page():
+    for _ in range(3):  # 回到底部标签页
+        if find("我的", exact=True):
+            break
+        key(4)
+        time.sleep(1.5)
+    go_tab("我的")
+    tap_text("观看历史", exact=True, wait=2)
+    wait_for("看到", timeout=10)
+    rows = [t for t in texts() if t.startswith("看到")]
+    first_title_y = find("看到")["y"]
+    tap(300, first_title_y)
+    time.sleep(3)
+    resumed = wait_for("上次观看位置", timeout=30)
+    key(4)
+    time.sleep(1.5)
+    key(4)
+    time.sleep(1.5)
+    return f"{len(rows)} 条有进度的记录；重新打开提示「{resumed['text']}」"
+
+
 if __name__ == "__main__":
     for t in [t_home, t_home_sort, t_search, t_search_sort, t_search_rating, t_suggest, t_tag, t_tag_sort, t_history,
-              t_login, t_follow, t_follow_user, t_feed, t_video, t_speed, t_longpress, t_author, t_tag_jump]:
+              t_login, t_follow, t_follow_user, t_feed, t_video, t_quality, t_speed, t_longpress, t_fullscreen,
+              t_author, t_tag_jump, t_history_page]:
         t()
     print("\n========== 测试结果 ==========")
     for status, name, detail in results:

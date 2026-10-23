@@ -1,6 +1,16 @@
 package com.example.iwaraphone.ui.common
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -47,6 +57,8 @@ import com.example.iwaraphone.data.model.formatCount
 import com.example.iwaraphone.data.model.formatDuration
 import com.example.iwaraphone.data.remote.ApiClient
 
+private const val SKELETON_COUNT = 8
+
 @Composable
 fun RemoteImage(url: String?, modifier: Modifier = Modifier) {
     val ctx = LocalContext.current
@@ -71,24 +83,71 @@ fun OptionRow(label: String, content: @Composable () -> Unit) {
     }
 }
 
+/** 分级角标：只有 R18（ecchi）显示 */
+@Composable
+fun RatingBadge(rating: String, modifier: Modifier = Modifier) {
+    if (rating != "ecchi") return
+    Text(
+        "R18", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold,
+        modifier = modifier.background(MaterialTheme.colorScheme.secondary, RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 1.dp),
+    )
+}
+
+private val CardShape = RoundedCornerShape(10.dp)
+
 @Composable
 fun VideoCard(v: Video, onClick: () -> Unit) {
-    Column(Modifier.clickable(onClick = onClick).padding(4.dp)) {
-        Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(8.dp))) {
-            RemoteImage(v.thumbnail, Modifier.fillMaxSize())
-            Row(
-                Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                    .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xAA000000))))
-                    .padding(horizontal = 6.dp, vertical = 3.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text("▶ ${formatCount(v.views)}", color = Color.White, fontSize = 11.sp)
-                Spacer(Modifier.weight(1f))
-                Text(formatDuration(v.durationSec), color = Color.White, fontSize = 11.sp)
+    Surface(onClick = onClick, shape = CardShape, color = MaterialTheme.colorScheme.surface, modifier = Modifier.padding(4.dp)) {
+        Column {
+            Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f)) {
+                RemoteImage(v.thumbnail, Modifier.fillMaxSize())
+                RatingBadge(v.rating, Modifier.align(Alignment.TopEnd).padding(6.dp))
+                Row(
+                    Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                        .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0x99000000))))
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("▶ ${formatCount(v.views)}", color = Color.White, fontSize = 11.sp)
+                    Spacer(Modifier.width(8.dp))
+                    Text("♥ ${formatCount(v.likes)}", color = Color.White, fontSize = 11.sp)
+                    Spacer(Modifier.weight(1f))
+                    Text(formatDuration(v.durationSec), color = Color.White, fontSize = 11.sp)
+                }
+            }
+            Column(Modifier.padding(horizontal = 8.dp, vertical = 6.dp)) {
+                Text(
+                    v.title, maxLines = 2, minLines = 2, overflow = TextOverflow.Ellipsis,
+                    fontSize = 13.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    v.author.name, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp),
+                )
             }
         }
-        Text(v.title, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
-        Text(v.author.name, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** 首次加载时的占位卡片（呼吸闪烁） */
+@Composable
+private fun SkeletonCard() {
+    val alpha by rememberInfiniteTransition(label = "skeleton").animateFloat(
+        initialValue = 0.4f, targetValue = 0.9f,
+        animationSpec = infiniteRepeatable(tween(800), RepeatMode.Reverse), label = "alpha",
+    )
+    val block = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)
+    Surface(shape = CardShape, color = MaterialTheme.colorScheme.surface, modifier = Modifier.padding(4.dp)) {
+        Column {
+            Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(block))
+            Column(Modifier.padding(8.dp)) {
+                Box(Modifier.fillMaxWidth().height(12.dp).background(block, RoundedCornerShape(4.dp)))
+                Spacer(Modifier.height(6.dp))
+                Box(Modifier.fillMaxWidth(0.6f).height(12.dp).background(block, RoundedCornerShape(4.dp)))
+                Spacer(Modifier.height(8.dp))
+                Box(Modifier.fillMaxWidth(0.4f).height(10.dp).background(block, RoundedCornerShape(4.dp)))
+            }
+        }
     }
 }
 
@@ -100,10 +159,13 @@ fun VideoGrid(state: Paged<Video>, onOpen: (Video) -> Unit, modifier: Modifier =
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
             contentPadding = PaddingValues(6.dp),
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
             modifier = Modifier.fillMaxSize(),
         ) {
             header?.invoke(this)
+            if (state.items.isEmpty() && state.loading) {
+                items(SKELETON_COUNT) { SkeletonCard() }
+                return@LazyVerticalGrid
+            }
             itemsIndexed(state.items, key = { _, v -> v.id }) { i, v ->
                 if (i >= state.items.size - 6) LaunchedEffect(state.items.size) { state.loadMore() }
                 VideoCard(v) { onOpen(v) }

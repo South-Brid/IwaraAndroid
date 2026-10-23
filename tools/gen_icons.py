@@ -9,29 +9,37 @@ from PIL import Image, ImageDraw
 RES = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app", "src", "main", "res")
 SIZES = {"mdpi": 48, "hdpi": 72, "xhdpi": 96, "xxhdpi": 144, "xxxhdpi": 192}
 SS = 4  # 超采样倍数，用于抗锯齿
-START, END = (0xFF, 0x5C, 0x8A), (0x7B, 0x5C, 0xFF)
+START, END = (0x46, 0xD3, 0xC4), (0x1E, 0x7F, 0xC2)
+# 位图图标没有自适应图标的安全区裁切，图案放大一些更饱满；图案中心在 108 视口的 (54, 64)
+SCALE, CX, CY = 1.45, 54, 64
 
 
 def render(px: int) -> Image.Image:
     n = px * SS
-    # 渐变背景（左上 → 右下）
-    grad = Image.new("RGB", (n, n))
-    pixels = grad.load()
+    img = Image.new("RGB", (n, n))
+    pixels = img.load()
     for y in range(n):
         for x in range(n):
             t = (x + y) / (2 * (n - 1))
             pixels[x, y] = tuple(round(a + (b - a) * t) for a, b in zip(START, END))
-    d = ImageDraw.Draw(grad)
-    # 图案坐标按 108 的视口换算，并放大 1.35 倍让传统图标中的图形更饱满（自适应图标的安全区不需要留给位图）
-    k = n / 108 * 1.35
-    cx = n / 2
+    d = ImageDraw.Draw(img)
+    k = n / 108 * SCALE
 
     def p(x, y):
-        return cx + (x - 54) * k, cx + (y - 50) * k
+        return n / 2 + (x - CX) * k, n / 2 + (y - CY) * k
 
-    d.polygon([p(46, 36), p(73, 50), p(46, 64)], fill="white")
-    d.polygon([p(37.5, 31), p(39.2, 35.8), p(44, 37.5), p(39.2, 39.2), p(37.5, 44), p(35.8, 39.2), p(31, 37.5), p(35.8, 35.8)], fill="white")
-    return grad
+    # 头梁：圆心 (54,62) 半径 21 的上半圆弧
+    x0, y0 = p(33, 41)
+    x1, y1 = p(75, 83)
+    d.arc([x0, y0, x1, y1], 180, 360, fill="white", width=max(1, round(5 * k)))
+    # 耳罩
+    for left in (29, 67):
+        a, b = p(left, 57)
+        c, e = p(left + 12, 77)
+        d.rounded_rectangle([a, b, c, e], radius=4 * k, fill="white")
+    # 播放键
+    d.polygon([p(49.5, 57), p(62, 64), p(49.5, 71)], fill="white")
+    return img
 
 
 def masked(img: Image.Image, round_: bool) -> Image.Image:
@@ -52,6 +60,5 @@ if __name__ == "__main__":
         base = render(px)
         for name, round_ in (("ic_launcher", False), ("ic_launcher_round", True)):
             icon = masked(base, round_).resize((px, px), Image.LANCZOS)
-            path = os.path.join(RES, f"mipmap-{density}", f"{name}.webp")
-            icon.save(path, "WEBP", lossless=True)
-            print("wrote", path)
+            icon.save(os.path.join(RES, f"mipmap-{density}", f"{name}.webp"), "WEBP", lossless=True)
+    print("icons written")

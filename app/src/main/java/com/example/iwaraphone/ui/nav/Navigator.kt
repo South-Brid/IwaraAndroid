@@ -9,6 +9,7 @@ import com.example.iwaraphone.data.model.User
 sealed interface Route {
     data class VideoDetail(val id: String) : Route
     data class UserVideos(val user: User) : Route
+    data object History : Route
 }
 
 /**

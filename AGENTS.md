@@ -15,8 +15,10 @@ iwara.tv 的安卓第三方客户端（个人自用），Kotlin + Jetpack Compos
 - 发布包：`.\gradlew.bat assembleRelease` → `app\build\outputs\apk\release\app-release.apk`
   - 签名读取根目录 `keystore.properties`（指向 `E:\Android\keystore\iwaraphone.jks`），两者都不进 git；丢失签名文件将无法覆盖升级已安装的 App，需自行备份
   - release 开启了 R8 全量优化；改动后要用 release 包跑一遍 `tools\test_features.py`（模板默认的 `packageScope` 局部优化会导致启动崩溃，不要加回去）
-- 功能测试（模拟器上逐项点击验证，18 项）：`python tools\test_features.py`
+- 功能测试（模拟器上逐项点击验证，21 项，约 7 分钟）：`python -u tools\test_features.py`
+  - 只跑部分用例：`python -u tools\test_features.py 视频 历史`（按用例名前缀筛选）
   - 登录用例需要环境变量 `IW_EMAIL` / `IW_PWD`，**不要把账号写进任何文件**
+  - 失败截图在 `build\test\fail_*.png`；先确认不是本机代理抖动（logcat 里 chromium `handshake failed ... net_error -100`），再查代码
 - 在 WebView 页面里调接口（探索 API 用）：`python tools\cdp_fetch.py "/videos?limit=2"`
 - Python 依赖：`websocket-client`
 
@@ -39,3 +41,6 @@ ui/
 - 接口细节和坑见 `docs/iwara-api.md`（如搜索 `type` 必须是 `videos`）
 - 不要用 `withTimeout` 包裹会被 `Paged` 捕获的请求：超时异常是 CancellationException，会被静默吞掉；用 `withTimeoutOrNull` 再抛普通异常
 - 模拟器的 goldfish 硬解码器解不了部分 H.264，`PlayerFactory` 里已把它排到最后
+- 播放器控制层是自研的 Compose 组件（`ui/video/VideoPlayer.kt`），PlayerView 只负责渲染（`useController = false`）
+- 离开视频页必须 `stopForLeave()` 停止预缓冲，否则后台下载会占满带宽，其它页面请求失败
+- 观看历史 `data/local/HistoryStore` 只存本机；VideoViewModel 每 5 秒及离开页面时保存进度

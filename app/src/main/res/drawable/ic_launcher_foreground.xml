@@ -1,14 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 白色圆角播放键 + 右上角小星星，图形都在 66dp 安全区内 -->
+<!-- 白色耳机 + 中间播放键，图形都在 66dp 安全区（21~87）内 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <!-- 头梁 -->
+    <path
+        android:pathData="M33,62A21,21 0,0 1,75 62"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeWidth="5" />
+    <!-- 左右耳罩 -->
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M45,37.5C45,34.4 48.4,32.5 51,34.1L72.2,46.6C74.8,48.1 74.8,51.9 72.2,53.4L51,65.9C48.4,67.5 45,65.6 45,62.5Z" />
+        android:pathData="M33,57h4a4,4 0,0 1,4 4v12a4,4 0,0 1,-4 4h-4a4,4 0,0 1,-4 -4v-12a4,4 0,0 1,4 -4z" />
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M37.5,31L39.2,35.8L44,37.5L39.2,39.2L37.5,44L35.8,39.2L31,37.5L35.8,35.8Z" />
+        android:pathData="M71,57h4a4,4 0,0 1,4 4v12a4,4 0,0 1,-4 4h-4a4,4 0,0 1,-4 -4v-12a4,4 0,0 1,4 -4z" />
+    <!-- 播放键 -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M49,58.5C49,57 50.6,56.1 51.9,56.9L61.3,62.4C62.6,63.2 62.6,64.8 61.3,65.6L51.9,71.1C50.6,71.9 49,71 49,69.5Z" />
 </vector>

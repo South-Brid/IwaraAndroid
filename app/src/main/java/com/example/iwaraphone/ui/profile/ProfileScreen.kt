@@ -39,6 +39,16 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.iwaraphone.data.AuthRepository
 import com.example.iwaraphone.data.AuthState
+import com.example.iwaraphone.data.local.HistoryStore
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
 import com.example.iwaraphone.data.model.User
 import com.example.iwaraphone.ui.common.RemoteImage
 import kotlinx.coroutines.launch
@@ -68,9 +78,9 @@ class ProfileViewModel : ViewModel() {
 }
 
 @Composable
-fun ProfileScreen(onOpenWeb: () -> Unit, vm: ProfileViewModel = viewModel()) {
+fun ProfileScreen(onOpenWeb: () -> Unit, onOpenHistory: () -> Unit, vm: ProfileViewModel = viewModel()) {
     Column(
-        Modifier.fillMaxSize().padding(24.dp),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -79,7 +89,21 @@ fun ProfileScreen(onOpenWeb: () -> Unit, vm: ProfileViewModel = viewModel()) {
             is AuthState.LoggedIn -> UserCard(s.user, vm::logout)
             AuthState.LoggedOut -> LoginForm(vm)
         }
+        HistoryEntryRow(onOpenHistory)
         TextButton(onClick = onOpenWeb) { Text("打开网页版（网页登录 / 人机验证）") }
+    }
+}
+
+@Composable
+private fun HistoryEntryRow(onClick: () -> Unit) {
+    val count = HistoryStore.entries.collectAsState().value.size
+    Surface(onClick = onClick, shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) {
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Filled.History, null, tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(12.dp))
+            Text("观看历史", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+            Text(if (count > 0) "$count 条 ›" else "›", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+        }
     }
 }
 
