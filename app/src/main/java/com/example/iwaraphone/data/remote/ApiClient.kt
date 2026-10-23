@@ -67,6 +67,8 @@ object ApiClient {
         retry: Boolean = false,
     ): String = checked(request(url(path), "POST", body?.toString(), headers, auth, retry))
 
+    suspend fun delete(path: String): String = checked(request(url(path), "DELETE", retry = true))
+
     fun checked(r: BridgeResponse): String {
         if (r.status in 200..299) return r.body
         if (r.status == 0) throw ApiException("网络连接失败，请检查网络或代理后重试", 0)

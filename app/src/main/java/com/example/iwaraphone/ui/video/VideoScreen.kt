@@ -64,6 +64,8 @@ import com.example.iwaraphone.data.model.User
 import com.example.iwaraphone.data.model.Video
 import com.example.iwaraphone.data.model.formatCount
 import com.example.iwaraphone.data.model.formatDuration
+import com.example.iwaraphone.ui.common.FollowButton
+import com.example.iwaraphone.ui.common.FollowToggle
 import com.example.iwaraphone.ui.common.RatingBadge
 import com.example.iwaraphone.ui.common.RemoteImage
 
@@ -114,7 +116,7 @@ fun VideoScreen(
         }
         LazyColumn(Modifier.fillMaxSize()) {
             item { Header(v) }
-            item { AuthorCard(v.author) { onUser(v.author) } }
+            item { AuthorCard(v.author, vm.follow) { onUser(v.author) } }
             item { Description(v.body) }
             if (v.tags.isNotEmpty()) item {
                 FlowRow(
@@ -185,7 +187,7 @@ private fun Stat(icon: ImageVector, text: String) {
 }
 
 @Composable
-private fun AuthorCard(author: User, onClick: () -> Unit) {
+private fun AuthorCard(author: User, follow: FollowToggle?, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -196,6 +198,7 @@ private fun AuthorCard(author: User, onClick: () -> Unit) {
             Text(author.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text("@${author.username}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
         }
+        follow?.let { FollowButton(it, Modifier.padding(end = 6.dp)) }
         OutlinedButton(onClick = onClick) { Text("作品 ›") }
     }
 }

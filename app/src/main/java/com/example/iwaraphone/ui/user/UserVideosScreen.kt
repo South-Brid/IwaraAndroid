@@ -23,6 +23,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -32,6 +33,8 @@ import com.example.iwaraphone.data.VideoRepository
 import com.example.iwaraphone.data.model.Sort
 import com.example.iwaraphone.data.model.User
 import com.example.iwaraphone.data.model.Video
+import com.example.iwaraphone.ui.common.FollowButton
+import com.example.iwaraphone.ui.common.FollowToggle
 import com.example.iwaraphone.ui.common.OptionRow
 import com.example.iwaraphone.ui.common.Paged
 import com.example.iwaraphone.ui.common.RemoteImage
@@ -41,6 +44,7 @@ class UserVideosViewModel(val user: User) : ViewModel() {
     var sort by mutableStateOf(Sort.Date)
         private set
     val list = Paged(viewModelScope, Video::id) { VideoRepository.list(VideoQuery(sort, userId = user.id), it) }
+    val follow = FollowToggle(viewModelScope, user)
 
     init {
         list.refresh()
@@ -63,10 +67,11 @@ fun UserVideosScreen(user: User, onOpen: (Video) -> Unit, onBack: () -> Unit) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") }
             RemoteImage(user.avatar, Modifier.size(44.dp).clip(CircleShape))
             Spacer(Modifier.width(10.dp))
-            Column {
-                Text(user.name, style = MaterialTheme.typography.titleMedium)
-                Text("@${user.username}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(Modifier.weight(1f)) {
+                Text(user.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("@${user.username}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
             }
+            FollowButton(vm.follow, Modifier.padding(end = 8.dp))
         }
         OptionRow("排序") {
             Sort.entries.forEach { s -> FilterChip(vm.sort == s, { vm.select(s) }, { Text(s.label) }) }

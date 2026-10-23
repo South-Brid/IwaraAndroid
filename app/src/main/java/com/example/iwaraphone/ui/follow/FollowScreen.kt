@@ -79,6 +79,14 @@ class FollowViewModel : ViewModel() {
                 }
             }
         }
+        viewModelScope.launch {
+            UserRepository.followChanged.collect { _ ->
+                if (userId != null) {
+                    people.refresh()
+                    feed.refresh()
+                }
+            }
+        }
     }
 }
 

@@ -73,6 +73,10 @@
 | `GET /profile/{username}` | 用户资料 `{user:{...}}`，用于由用户名查 id |
 | `GET /user/{id}/following?page=0&limit=32` | 关注列表，每项 `{id, createdAt, user:{...}}` |
 | `GET /user/{id}/followers` | 粉丝列表，结构同上 |
+| `POST /user/{id}/followers` | 关注该用户（需登录）。*未在模拟器实测* |
+| `DELETE /user/{id}/followers` | 取消关注（需登录）。*未在模拟器实测* |
+
+是否已关注：登录后 `GET /profile/{username}` 的 `user.following`（布尔）。*未在模拟器实测*
 
 头像地址：`https://i.iwara.tv/image/avatar/{avatar.id}/{avatar.name}`。
 

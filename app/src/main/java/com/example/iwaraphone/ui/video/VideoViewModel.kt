@@ -15,6 +15,7 @@ import com.example.iwaraphone.data.local.HistoryStore
 import com.example.iwaraphone.data.model.Sort
 import com.example.iwaraphone.data.model.Video
 import com.example.iwaraphone.data.model.VideoSource
+import com.example.iwaraphone.ui.common.FollowToggle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -38,6 +39,9 @@ class VideoViewModel(private val id: String, ctx: Context) : ViewModel() {
         private set
     /** 作者的其他热门作品（详情页底部推荐） */
     var authorVideos by mutableStateOf<List<Video>>(emptyList())
+        private set
+    /** 作者的关注状态，详情加载后创建 */
+    var follow by mutableStateOf<FollowToggle?>(null)
         private set
     /** 断点续播时的提示文字，显示几秒后清空 */
     var resumeHint by mutableStateOf<String?>(null)
@@ -95,6 +99,7 @@ class VideoViewModel(private val id: String, ctx: Context) : ViewModel() {
             runCatching {
                 val v = VideoRepository.detail(id)
                 video = v
+                if (follow == null) follow = FollowToggle(viewModelScope, v.author)
                 HistoryStore.record(v)
                 loadAuthorVideos(v)
                 when {
