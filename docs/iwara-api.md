@@ -1,13 +1,12 @@
 # iwara 接口文档（2026-10 实测）
 
-所有结论均在模拟器上通过 App 的浏览器通道实际验证。iwara 是非官方接口，可能随网站改版变化；
-变化时用 `tools/cdp_fetch.py` 或 App 内「调试」页重新验证。
+iwara 是非官方接口，可能随网站改版变化。
 
 ## 访问方式
 
 | 域名 | 用途 | Cloudflare 验证 | 访问方式 |
 |---|---|---|---|
-| `apiq.iwara.tv` | JSON 接口 | **有** | 默认 OkHttp（共用 WebView 的 Cookie 和 UA）；被拦截时让用户在 WebView 验证，仍不行则改走 `WebBridge` 页面内 `fetch` |
+| `apiq.iwara.tv` | JSON 接口 | 可能有 | OkHttp 直连（共用 WebView 的 Cookie 和 UA）；被拦截时弹出 WebView 让用户验证后重试 |
 | `i.iwara.tv` | 封面、头像 | 无 | 原生直接加载（带 `Referer: https://www.iwara.tv/`） |
 | `*.iwara.tv` 视频文件 | 播放地址 | 无 | ExoPlayer 原生播放（带 Referer） |
 
@@ -79,5 +78,3 @@
 是否已关注：登录后 `GET /profile/{username}` 的 `user.following`（布尔）。*未在模拟器实测*
 
 头像地址：`https://i.iwara.tv/image/avatar/{avatar.id}/{avatar.name}`。
-
-网页端登录后，刷新令牌保存在 `localStorage.token`，App 会作为备用读取。

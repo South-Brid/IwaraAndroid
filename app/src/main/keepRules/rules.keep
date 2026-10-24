@@ -3,8 +3,3 @@
 #
 # For more details, see
 #   https://d.android.com/r/tools/r8/keep-rules
-
-# WebBridge 的 JS 回调通过反射调用，混淆/裁剪后会失效
--keepclassmembers class * {
-    @android.webkit.JavascriptInterface <methods>;
-}

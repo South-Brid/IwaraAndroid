@@ -75,13 +75,11 @@ class ProfileViewModel : ViewModel() {
         }
     }
 
-    fun logout() {
-        viewModelScope.launch { AuthRepository.logout() }
-    }
+    fun logout() = AuthRepository.logout()
 }
 
 @Composable
-fun ProfileScreen(onOpenWeb: () -> Unit, onOpenHistory: () -> Unit, vm: ProfileViewModel = viewModel()) {
+fun ProfileScreen(onOpenHistory: () -> Unit, vm: ProfileViewModel = viewModel()) {
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -93,7 +91,6 @@ fun ProfileScreen(onOpenWeb: () -> Unit, onOpenHistory: () -> Unit, vm: ProfileV
             AuthState.LoggedOut -> LoginForm(vm)
         }
         HistoryEntryRow(onOpenHistory)
-        TextButton(onClick = onOpenWeb) { Text("打开网页版（网页登录 / 人机验证）") }
         VersionText()
     }
 }

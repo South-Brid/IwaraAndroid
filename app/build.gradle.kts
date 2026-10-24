@@ -11,8 +11,8 @@ val keystoreProps = Properties().apply {
 }
 
 // 每次发版改这里：versionCode 递增，versionName 用 主.次.修订
-val appVersionCode = 3
-val appVersionName = "1.2.0"
+val appVersionCode = 4
+val appVersionName = "1.3.0"
 
 // 安装包文件名带版本号：IwaraPhone-1.1.0-debug.apk / IwaraPhone-1.1.0-release.apk
 base.archivesName = "IwaraPhone-$appVersionName"

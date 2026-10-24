@@ -1,23 +1,14 @@
 package com.example.iwaraphone
 
-import android.content.pm.ApplicationInfo
 import android.os.Bundle
-import android.webkit.WebView
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
@@ -27,38 +18,31 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.iwaraphone.bridge.WebBridge
 import com.example.iwaraphone.data.AuthRepository
 import com.example.iwaraphone.data.local.HistoryStore
 import com.example.iwaraphone.data.local.Session
-import com.example.iwaraphone.ui.history.HistoryScreen
 import com.example.iwaraphone.data.remote.ApiClient
 import com.example.iwaraphone.data.remote.Network
-import com.example.iwaraphone.ui.debug.DebugScreen
+import com.example.iwaraphone.ui.common.CloudflareDialogHost
 import com.example.iwaraphone.ui.follow.FollowScreen
+import com.example.iwaraphone.ui.history.HistoryScreen
 import com.example.iwaraphone.ui.home.HomeScreen
 import com.example.iwaraphone.ui.nav.Navigator
 import com.example.iwaraphone.ui.nav.Route
@@ -74,57 +58,35 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        // 组装依赖：本地存储 → 令牌提供者 → 原生网络 → 浏览器通道（只在人机验证 / 网页版时加载页面）
         Session.init(this)
         HistoryStore.init(this)
-        ApiClient.tokenProvider = AuthRepository
         Network.init(this)
-        WebView.setWebContentsDebuggingEnabled(applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0)
-        val webView = WebView(this)
-        WebBridge.attach(webView)
+        ApiClient.tokenProvider = AuthRepository
         lifecycleScope.launch { AuthRepository.refresh() }
-        setContent { IwaraPhoneTheme { App(webView) } }
-    }
-
-    override fun onDestroy() {
-        WebBridge.detach()
-        super.onDestroy()
+        setContent { IwaraPhoneTheme { App() } }
     }
 }
 
-private enum class Tab(val label: String, val icon: ImageVector, val debugOnly: Boolean = false) {
+private enum class Tab(val label: String, val icon: ImageVector) {
     Home("首页", Icons.Filled.Home),
     Search("搜索", Icons.Filled.Search),
     Follow("关注", Icons.Filled.Favorite),
     Me("我的", Icons.Filled.Person),
-    Debug("调试", Icons.Filled.Build, debugOnly = true),
 }
 
 @Composable
-private fun App(webView: WebView) {
+private fun App() {
     val nav = remember { Navigator() }
-    val scope = rememberCoroutineScope()
     var tab by rememberSaveable { mutableStateOf(Tab.Home) }
     var fullscreen by remember { mutableStateOf(false) }
-    var webOpen by rememberSaveable { mutableStateOf(false) }
     val searchVm: SearchViewModel = viewModel()
-    val showWeb = webOpen || WebBridge.needsUser
-    val closeWeb: () -> Unit = {
-        webOpen = false
-        scope.launch { AuthRepository.refresh() }
-    }
     val openVideo = { id: String -> nav.push(Route.VideoDetail(id)) }
-    val debuggable = LocalContext.current.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
-    val tabs = Tab.entries.filter { debuggable || !it.debugOnly }
-
-    BackHandler(enabled = webOpen) { if (webView.canGoBack()) webView.goBack() else closeWeb() }
-    BackHandler(enabled = WebBridge.needsUser && !webOpen) { WebBridge.cancelVerify() }
 
     Scaffold(
         contentWindowInsets = if (fullscreen) WindowInsets(0) else ScaffoldDefaults.contentWindowInsets,
         bottomBar = {
-            if (nav.top == null && !showWeb) NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
-                tabs.forEach { t ->
+            if (nav.top == null) NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
+                Tab.entries.forEach { t ->
                     NavigationBarItem(
                         selected = tab == t, onClick = { tab = t },
                         icon = { Icon(t.icon, t.label) }, label = { Text(t.label) },
@@ -162,30 +124,9 @@ private fun App(webView: WebView) {
                 Tab.Home -> HomeScreen(onOpen = { openVideo(it.id) }, onSearch = { tab = Tab.Search })
                 Tab.Search -> SearchScreen(searchVm, onOpen = { openVideo(it.id) })
                 Tab.Follow -> FollowScreen(onUser = { nav.push(Route.UserVideos(it)) }, onOpen = { openVideo(it.id) }, onLogin = { tab = Tab.Me })
-                Tab.Me -> ProfileScreen(onOpenWeb = { WebBridge.ensureLoaded(); webOpen = true }, onOpenHistory = { nav.push(Route.History) })
-                Tab.Debug -> DebugScreen()
+                Tab.Me -> ProfileScreen(onOpenHistory = { nav.push(Route.History) })
             }
-            if (showWeb) WebToolbar(webView, onClose = if (webOpen) closeWeb else WebBridge::cancelVerify)
-            AndroidView(
-                factory = { webView },
-                modifier = if (showWeb) Modifier.fillMaxSize().padding(top = 48.dp) else Modifier.size(1.dp).alpha(0f),
-            )
         }
     }
-}
-
-@Composable
-private fun WebToolbar(webView: WebView, onClose: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().height(48.dp).background(MaterialTheme.colorScheme.surfaceVariant).padding(horizontal = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            if (WebBridge.needsUser) "请完成人机验证，通过后自动返回" else "网页版 · ${WebBridge.status}",
-            style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 8.dp).weight(1f),
-        )
-        if (!WebBridge.needsUser) TextButton(onClick = { webView.loadUrl(WebBridge.HOME) }) { Text("主页") }
-        TextButton(onClick = { webView.reload() }) { Text("刷新") }
-        TextButton(onClick = onClose) { Text(if (WebBridge.needsUser) "取消" else "关闭") }
-    }
+    CloudflareDialogHost()
 }

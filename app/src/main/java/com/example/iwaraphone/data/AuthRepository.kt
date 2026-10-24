@@ -1,6 +1,5 @@
 package com.example.iwaraphone.data
 
-import com.example.iwaraphone.bridge.WebBridge
 import com.example.iwaraphone.data.local.Session
 import com.example.iwaraphone.data.model.User
 import com.example.iwaraphone.data.model.parseUser
@@ -29,18 +28,14 @@ object AuthRepository : TokenProvider {
     private val _state = MutableStateFlow<AuthState>(AuthState.Unknown)
     val state: StateFlow<AuthState> = _state.asStateFlow()
 
-    /** 重新确认登录状态（启动时、网页登录后调用） */
+    /** 重新确认登录状态（启动时调用） */
     suspend fun refresh() {
         _state.value = runCatching { currentUser() }.getOrNull()?.let(AuthState::LoggedIn) ?: AuthState.LoggedOut
     }
 
-    /** 优先用本 App 登录保存的刷新令牌，其次用网页端登录写入 localStorage 的 */
-    private suspend fun refreshToken(): String? =
-        Session.refreshToken ?: WebBridge.localStorage()["token"]?.takeIf { it.isNotBlank() }
-
     override suspend fun accessToken(): String? {
         if (accessToken != null && System.currentTimeMillis() - accessTokenAt < ACCESS_TTL_MS) return accessToken
-        val refresh = refreshToken() ?: return null
+        val refresh = Session.refreshToken ?: return null
         val r = ApiClient.request(ApiClient.url("/user/token"), "POST", headers = mapOf("Authorization" to "Bearer $refresh"), auth = false, retry = true)
         if (r.status == 401) Session.refreshToken = null
         accessToken = runCatching { JSONObject(r.body).getString("accessToken") }.getOrNull()
@@ -64,10 +59,9 @@ object AuthRepository : TokenProvider {
         return parseUser(u).takeIf { it.id.isNotBlank() }
     }
 
-    suspend fun logout() {
+    fun logout() {
         Session.refreshToken = null
         accessToken = null
-        WebBridge.clearWebToken()
         _state.value = AuthState.LoggedOut
     }
 }
