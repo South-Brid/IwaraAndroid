@@ -24,7 +24,8 @@ iwara.tv 的安卓第三方客户端（个人自用），Kotlin + Jetpack Compos
   - 包名 `com.example.iwaraphone.debug`、桌面名「IwaraPhone 测试版」，可与正式版同时安装（数据和登录互相独立）
 - 版本号：改 `app\build.gradle.kts` 顶部的 `appVersionCode`（每次发版 +1）/ `appVersionName`；「我的」页底部显示当前版本
 - 发布包：`.\gradlew.bat assembleRelease` → `app\build\outputs\apk\release\IwaraPhone-<版本>-release.apk`
-  - 签名读取根目录 `keystore.properties`（指向 `E:\Android\keystore\iwaraphone.jks`），两者都不进 git；丢失签名文件将无法覆盖升级已安装的 App，需自行备份
+  - 签名读取根目录 `keystore.properties`（指向 `E:\Android\keystore\iwaraphone.jks`，别名 `iwaraphone`），两者都不进 git；`E:\Android\keystore\` 下另存了一份 `keystore.properties`，备份时整个目录一起备份。丢失签名文件将无法覆盖升级已安装的 App
+  - 当前签名于 2026-10-24（1.3.0）重新生成，证书 SHA-256 `54eb48e5…20280864`；更早的正式版签名不同，需卸载后安装
   - release 开启了 R8 全量优化（模板默认的 `packageScope` 局部优化会导致启动崩溃，不要加回去）
 - 图标生成：`python tools\gen_icons.py`（源图 `art\icon_source.png`）
 
