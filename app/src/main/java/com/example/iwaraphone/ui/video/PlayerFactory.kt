@@ -10,8 +10,8 @@ import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.mediacodec.MediaCodecUtil
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
-import com.example.iwaraphone.bridge.WebBridge
 import com.example.iwaraphone.data.remote.ApiClient
+import com.example.iwaraphone.data.remote.Network
 
 object PlayerFactory {
     private const val LOAD_RETRIES = 6
@@ -19,7 +19,7 @@ object PlayerFactory {
     @OptIn(UnstableApi::class)
     fun create(ctx: Context): ExoPlayer {
         val http = DefaultHttpDataSource.Factory()
-            .setUserAgent(WebBridge.userAgent)
+            .setUserAgent(Network.userAgent)
             .setDefaultRequestProperties(mapOf("Referer" to ApiClient.REFERER))
             .setAllowCrossProtocolRedirects(true)
         // 模拟器的 goldfish 硬解码器对 H.264 High Profile 支持不稳定，排到最后改用软解；真机不受影响

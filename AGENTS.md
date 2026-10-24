@@ -2,6 +2,11 @@
 
 iwara.tv 的安卓第三方客户端（个人自用），Kotlin + Jetpack Compose + Media3。
 
+## 用户偏好
+
+- 用户自己测试 App：改完只需编译出包（必要时装到已运行的模拟器），不要编写验证 / 测试脚本
+- 每次出包都递增版本号（见下方"版本号"）
+
 ## 环境
 
 - 开发工具和缓存一律放 E 盘，不要装到 C 盘
@@ -32,10 +37,12 @@ iwara.tv 的安卓第三方客户端（个人自用），Kotlin + Jetpack Compos
 ## 架构约定
 
 ```
-bridge/WebBridge      浏览器通道：后台 WebView 通过 Cloudflare 验证，接口请求在页面内 fetch
+bridge/WebBridge      浏览器通道：平时不加载网页；遇到 Cloudflare 验证时显示 WebView 让用户自己验证（verify），
+                      原生请求验证后仍被拦截时作为后备在页面内 fetch；"网页版"入口也复用它
 data/
   model/              数据模型、枚举、JSON 解析（不依赖网络）
-  remote/ApiClient    请求入口：请求头、令牌注入（依赖 TokenProvider 接口）、错误映射
+  remote/Network      原生通道：OkHttp，与 WebView 共用 Cookie（cf_clearance）和 User-Agent
+  remote/ApiClient    请求入口：请求头、令牌注入（依赖 TokenProvider 接口）、验证 / 通道切换、错误映射
   local/Session       本地存储（令牌、搜索历史）
   *Repository         按业务拆分：Auth（登录状态唯一来源 AuthState）/ Video / User / Tag
 ui/

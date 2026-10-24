@@ -67,7 +67,7 @@ object AuthRepository : TokenProvider {
     suspend fun logout() {
         Session.refreshToken = null
         accessToken = null
-        WebBridge.eval("localStorage.removeItem('token')")
+        WebBridge.clearWebToken()
         _state.value = AuthState.LoggedOut
     }
 }

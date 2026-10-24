@@ -37,6 +37,7 @@ import com.example.iwaraphone.data.model.IMG
 import com.example.iwaraphone.data.model.objects
 import com.example.iwaraphone.data.model.parseSources
 import com.example.iwaraphone.data.remote.ApiClient
+import com.example.iwaraphone.data.remote.Network
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -136,7 +137,7 @@ class DebugViewModel : ViewModel() {
     private suspend fun nativeProbe(url: String, range: Boolean = false): Pair<Int, String> = withContext(Dispatchers.IO) {
         val c = (URL(url).openConnection() as HttpURLConnection).apply {
             setRequestProperty("Referer", ApiClient.REFERER)
-            setRequestProperty("User-Agent", WebBridge.userAgent)
+            setRequestProperty("User-Agent", Network.userAgent)
             if (range) setRequestProperty("Range", "bytes=0-1023")
             connectTimeout = 15_000
             readTimeout = 15_000

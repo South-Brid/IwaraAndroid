@@ -7,7 +7,7 @@
 
 | 域名 | 用途 | Cloudflare 验证 | 访问方式 |
 |---|---|---|---|
-| `apiq.iwara.tv` | JSON 接口 | **有** | 必须经 `WebBridge`（WebView 内 `fetch`） |
+| `apiq.iwara.tv` | JSON 接口 | **有** | 默认 OkHttp（共用 WebView 的 Cookie 和 UA）；被拦截时让用户在 WebView 验证，仍不行则改走 `WebBridge` 页面内 `fetch` |
 | `i.iwara.tv` | 封面、头像 | 无 | 原生直接加载（带 `Referer: https://www.iwara.tv/`） |
 | `*.iwara.tv` 视频文件 | 播放地址 | 无 | ExoPlayer 原生播放（带 Referer） |
 

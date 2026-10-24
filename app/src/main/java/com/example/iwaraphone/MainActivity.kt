@@ -56,6 +56,7 @@ import com.example.iwaraphone.data.local.HistoryStore
 import com.example.iwaraphone.data.local.Session
 import com.example.iwaraphone.ui.history.HistoryScreen
 import com.example.iwaraphone.data.remote.ApiClient
+import com.example.iwaraphone.data.remote.Network
 import com.example.iwaraphone.ui.debug.DebugScreen
 import com.example.iwaraphone.ui.follow.FollowScreen
 import com.example.iwaraphone.ui.home.HomeScreen
@@ -73,10 +74,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        // 组装依赖：本地存储 → 令牌提供者 → 浏览器通道
+        // 组装依赖：本地存储 → 令牌提供者 → 原生网络 → 浏览器通道（只在人机验证 / 网页版时加载页面）
         Session.init(this)
         HistoryStore.init(this)
         ApiClient.tokenProvider = AuthRepository
+        Network.init(this)
         WebView.setWebContentsDebuggingEnabled(applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0)
         val webView = WebView(this)
         WebBridge.attach(webView)
@@ -116,6 +118,7 @@ private fun App(webView: WebView) {
     val tabs = Tab.entries.filter { debuggable || !it.debugOnly }
 
     BackHandler(enabled = webOpen) { if (webView.canGoBack()) webView.goBack() else closeWeb() }
+    BackHandler(enabled = WebBridge.needsUser && !webOpen) { WebBridge.cancelVerify() }
 
     Scaffold(
         contentWindowInsets = if (fullscreen) WindowInsets(0) else ScaffoldDefaults.contentWindowInsets,
@@ -159,10 +162,10 @@ private fun App(webView: WebView) {
                 Tab.Home -> HomeScreen(onOpen = { openVideo(it.id) }, onSearch = { tab = Tab.Search })
                 Tab.Search -> SearchScreen(searchVm, onOpen = { openVideo(it.id) })
                 Tab.Follow -> FollowScreen(onUser = { nav.push(Route.UserVideos(it)) }, onOpen = { openVideo(it.id) }, onLogin = { tab = Tab.Me })
-                Tab.Me -> ProfileScreen(onOpenWeb = { webOpen = true }, onOpenHistory = { nav.push(Route.History) })
+                Tab.Me -> ProfileScreen(onOpenWeb = { WebBridge.ensureLoaded(); webOpen = true }, onOpenHistory = { nav.push(Route.History) })
                 Tab.Debug -> DebugScreen()
             }
-            if (showWeb) WebToolbar(webView, closable = webOpen, onClose = closeWeb)
+            if (showWeb) WebToolbar(webView, onClose = if (webOpen) closeWeb else WebBridge::cancelVerify)
             AndroidView(
                 factory = { webView },
                 modifier = if (showWeb) Modifier.fillMaxSize().padding(top = 48.dp) else Modifier.size(1.dp).alpha(0f),
@@ -172,17 +175,17 @@ private fun App(webView: WebView) {
 }
 
 @Composable
-private fun WebToolbar(webView: WebView, closable: Boolean, onClose: () -> Unit) {
+private fun WebToolbar(webView: WebView, onClose: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().height(48.dp).background(MaterialTheme.colorScheme.surfaceVariant).padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            if (WebBridge.needsUser) "请在下方完成人机验证" else "网页版 · ${WebBridge.status}",
+            if (WebBridge.needsUser) "请完成人机验证，通过后自动返回" else "网页版 · ${WebBridge.status}",
             style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 8.dp).weight(1f),
         )
-        TextButton(onClick = { webView.loadUrl(WebBridge.HOME) }) { Text("主页") }
+        if (!WebBridge.needsUser) TextButton(onClick = { webView.loadUrl(WebBridge.HOME) }) { Text("主页") }
         TextButton(onClick = { webView.reload() }) { Text("刷新") }
-        if (closable) TextButton(onClick = onClose) { Text("关闭") }
+        TextButton(onClick = onClose) { Text(if (WebBridge.needsUser) "取消" else "关闭") }
     }
 }

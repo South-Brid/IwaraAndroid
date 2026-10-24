@@ -13,7 +13,11 @@ fun interface TokenProvider {
     suspend fun accessToken(): String?
 }
 
-/** iwara 接口的请求入口：所有请求经 WebBridge 在浏览器中发出，统一处理请求头、令牌和错误 */
+/**
+ * iwara 接口的请求入口：统一处理请求头、令牌和错误。
+ * 默认走原生通道（[Network]）；遇到 Cloudflare 验证时让用户在 WebView 里验证一次再重试，
+ * 验证后原生请求仍被拦截，则本次运行改走浏览器通道（[WebBridge.fetch]）。
+ */
 object ApiClient {
     const val BASE = "https://apiq.iwara.tv"
     const val REFERER = "https://www.iwara.tv/"
@@ -21,6 +25,10 @@ object ApiClient {
     private const val RETRY_BASE_DELAY_MS = 1_000L
 
     var tokenProvider = TokenProvider { null }
+
+    /** 原生请求在验证后仍被拦截时置为 true，之后全部走浏览器通道 */
+    @Volatile
+    private var useBrowser = false
 
     private val baseHeaders = mapOf("Accept" to "application/json", "Content-Type" to "application/json")
 
@@ -33,7 +41,7 @@ object ApiClient {
 
     /**
      * 遇到网络层失败（status 0，如代理瞬断）时自动重试。
-     * 默认只重试 GET；登录、换令牌这类重复提交无副作用的 POST 可传 [retry] = true。
+     * 默认只重试 GET；登录、换令牌这类重复提交无副作用的请求可传 [retry] = true。
      */
     suspend fun request(
         url: String,
@@ -45,16 +53,32 @@ object ApiClient {
     ): BridgeResponse {
         val token = if (auth) tokenProvider.accessToken() else null
         val authHeader = token?.let { mapOf("Authorization" to "Bearer $it") }.orEmpty()
+        val all = baseHeaders + authHeader + headers
+        var r = send(url, method, all, body, retry)
+        if (r.isChallenge && !useBrowser && WebBridge.verify()) {
+            r = send(url, method, all, body, retry)
+            if (r.isChallenge) {
+                useBrowser = true
+                r = send(url, method, all, body, retry)
+            }
+        }
+        return r
+    }
+
+    private suspend fun send(url: String, method: String, headers: Map<String, String>, body: String?, retry: Boolean): BridgeResponse {
         val attempts = if (retry) NETWORK_RETRIES + 1 else 1
-        var r = WebBridge.fetch(url, method, baseHeaders + authHeader + headers, body)
+        var r = fetch(url, method, headers, body)
         // 指数退避（1s、2s、4s、8s）：握手失败等错误会瞬间返回，间隔太短的重试扛不住几秒的网络抖动
         for (i in 1 until attempts) {
             if (r.status != 0) break
             delay(RETRY_BASE_DELAY_MS shl (i - 1))
-            r = WebBridge.fetch(url, method, baseHeaders + authHeader + headers, body)
+            r = fetch(url, method, headers, body)
         }
         return r
     }
+
+    private suspend fun fetch(url: String, method: String, headers: Map<String, String>, body: String?) =
+        if (useBrowser) WebBridge.fetch(url, method, headers, body) else Network.fetch(url, method, headers, body)
 
     suspend fun get(path: String, params: Map<String, Any?> = emptyMap(), headers: Map<String, String> = emptyMap()): String =
         checked(request(url(path, params), headers = headers))
@@ -72,6 +96,7 @@ object ApiClient {
     fun checked(r: BridgeResponse): String {
         if (r.status in 200..299) return r.body
         if (r.status == 0) throw ApiException("网络连接失败，请检查网络或代理后重试", 0)
+        if (r.isChallenge) throw ApiException("需要完成人机验证，请重试", r.status)
         val key = runCatching { JSONObject(r.body).optString("message") }.getOrNull().orEmpty()
         val msg = when (key) {
             "errors.invalidLogin" -> "邮箱或密码错误"
